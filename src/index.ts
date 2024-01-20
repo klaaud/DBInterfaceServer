@@ -4,7 +4,12 @@ import pgPromise from 'pg-promise';
 
 const app = express();
 const port = 5001;
-
+interface PgError extends Error {
+  detail?: string;
+  hint?: string;
+  code?: string;
+  // ... add other properties if needed
+}
 app.use(express.json());
 app.use(cors());
 
@@ -115,7 +120,7 @@ app.post('/api/AddToTable', async (req, res) => {
     res.json({ success: true });
   } catch (error) {
     console.error('Error creating table:', error as Error);
-    res.status(500).json({ success: false, error: 'Internal Server Error' });
+    res.status(500).json({ success: false, error: error});
   }
 });
 
@@ -193,7 +198,40 @@ app.post('/api/deleteFromTable', async (req, res) => {
 
   } catch (error) {
     console.error('Error deleting row from table:', error as Error);
-    res.status(500).json({ success: false, error: 'Internal Server Error' });
+    res.status(500).json({ success: false, error: error });
+  }
+});
+
+app.post('/api/executeQuery', async (req, res) => {
+  const { query } = req.body; // Extract SQL query from request body
+
+  // You might want to add additional authentication and validation here to ensure that only authorized and safe queries are executed.
+
+  try {
+    const dbConnection = pgPromise()({
+      host: 'localhost',
+      port: 5432,
+      database: 'mydatabase', // Replace with your actual database name
+      user: 'klaudiazalewska', // Replace with your actual username
+      password: '', // Replace with your actual password
+    });
+
+    // Execute the query using the connected database
+    const result = await dbConnection.any(query); // 'any' is used here for example, you might need 'none', 'one', or 'many' based on your query
+
+    res.json({ success: true, result });
+  } catch (error) {
+    console.log(error);
+    console.error('Error executing query:', error as Error);
+    const pgError = error as PgError; // Type assertion to 'PgError'
+    console.error('Error executing query:',pgError.message);
+    res.status(500).json({ 
+      success: false, 
+      error: 'Error executing query',
+      message: pgError.message, // Send the error message
+      detail: pgError.detail, // Send the detailed error message if available
+      hint: pgError.hint, // Send the hint if available
+    });
   }
 });
 
